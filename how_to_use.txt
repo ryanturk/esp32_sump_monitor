@@ -1,0 +1,215 @@
+Sump Pump Water Alarm - How To Use
+==================================
+
+Overview
+--------
+This project runs fully offline on an ESP32 development board. It measures the
+distance from an ultrasonic sensor to the water surface, calculates the water
+height in the sump pit, and turns on an alert LED and buzzer chirp when the
+water gets too high.
+
+Settings are changed over the ESP32 USB serial connection and are saved in
+EEPROM, so they are retained after power loss or reset.
+
+
+Serial Connection
+-----------------
+Use the ESP32 board's USB-C port for both power and serial communication.
+
+In Tera Term:
+
+1. Open Tera Term.
+2. Select Serial.
+3. Choose the ESP32 COM port.
+4. Go to Setup > Serial port...
+5. Set:
+   - Speed: 9600
+   - Data: 8 bit
+   - Parity: none
+   - Stop bits: 1 bit
+   - Flow control: none
+6. Go to Setup > Terminal...
+7. Recommended settings:
+   - Receive new-line: CR+LF
+   - Transmit new-line: CR+LF
+   - Local echo: on if you want to see what you type
+   - Local line editing: off
+
+Type a command and press Enter.
+
+
+Pin Connections
+---------------
+Current ESP32 pin map:
+
+GPIO25 -> ultrasonic sensor TRIG
+GPIO26 -> ultrasonic sensor ECHO through voltage divider
+GPIO27 -> buzzer signal
+GPIO21 -> system-on LED
+GPIO16 -> error LED
+GPIO17 -> high-water alert LED
+
+Ultrasonic sensor wiring:
+
+Sensor VCC  -> ESP32 5V / VIN
+Sensor GND  -> ESP32 GND
+Sensor TRIG -> ESP32 GPIO25
+Sensor ECHO -> voltage divider -> ESP32 GPIO26
+
+Use a voltage divider on the ECHO line because many ultrasonic sensors output
+5V on ECHO, and ESP32 GPIO pins are 3.3V only.
+
+Recommended ECHO divider:
+
+Sensor ECHO ---- 1k resistor ---- junction ---- GPIO26
+                                  |
+                                2k resistor
+                                  |
+                                 GND
+
+Use one current-limiting resistor per LED. A 330 ohm resistor is a good default.
+
+For the buzzer, use a transistor driver if the buzzer is powered above 3.3V or
+draws more current than an ESP32 GPIO should supply directly.
+
+
+Commands
+--------
+STATUS
+  Prints current sensor readings, alarm state, error state, and saved settings.
+
+S
+  Shortcut for STATUS.
+
+HELP
+  Prints the command list.
+
+DEFAULTS
+  Restores default settings and saves them.
+
+TESTCHIRP
+  Plays three short chirps, then stops.
+
+DEPTH=<inches>
+  Sets the distance from the ultrasonic sensor face to the bottom of the sump
+  pit, in inches.
+
+HIGH=<inches>
+  Sets the water height where the high-water alarm turns on.
+
+CLEAR=<inches>
+  Sets the water height where the alarm clears.
+
+COOLDOWN=<seconds>
+  Sets how often the alert message can print while the alarm is active.
+
+CHIRP=<seconds>
+  Sets how often the buzzer chirps while the alarm is active.
+  Use CHIRP=0 to disable alarm chirps.
+
+
+Command Examples
+----------------
+Print current status:
+
+STATUS
+
+Set the sensor-to-bottom distance to 28 inches:
+
+DEPTH=28
+
+Turn the high-water alarm on at 16 inches of water:
+
+HIGH=16
+
+Clear the alarm after water falls to 15 inches:
+
+CLEAR=15
+
+Chirp once every 5 seconds while high-water alarm is active:
+
+CHIRP=5
+
+Disable alarm chirps:
+
+CHIRP=0
+
+Test the buzzer:
+
+TESTCHIRP
+
+Restore default settings:
+
+DEFAULTS
+
+
+Water Measurements
+------------------
+The ultrasonic sensor measures distance downward from the sensor face to the
+water surface.
+
+The code calculates water height like this:
+
+water height = DEPTH - measured distance
+
+DEPTH is the distance from the sensor face to the bottom of the sump pit.
+
+Example:
+
+DEPTH = 28 inches
+Measured distance to water = 12 inches
+
+Water height = 28 - 12 = 16 inches
+
+If HIGH is set to 16, the alarm turns on when the water reaches 16 inches high.
+
+If CLEAR is set to 15, the alarm stays on until the water falls back to 15
+inches or lower. This gap between HIGH and CLEAR prevents the alarm from
+rapidly turning on and off when the water is right at the threshold.
+
+
+Recommended Setup Process
+-------------------------
+1. Measure from the ultrasonic sensor face straight down to the sump pit bottom.
+2. Send DEPTH=<that measurement>.
+3. Decide the water height where the alarm should trigger.
+4. Send HIGH=<trigger height>.
+5. Set CLEAR slightly lower than HIGH.
+6. Send CLEAR=<clear height>.
+7. Set chirp interval.
+8. Send CHIRP=<seconds>.
+9. Send STATUS to confirm all settings.
+
+Example setup:
+
+DEPTH=28
+HIGH=16
+CLEAR=15
+CHIRP=5
+STATUS
+
+
+LED Behavior
+------------
+System-on LED:
+  Turns on after boot completes.
+
+Error LED:
+  Flashes when the ultrasonic sensor is not returning a valid echo.
+
+High-water alert LED:
+  Turns on while the high-water alarm is active.
+
+
+Notes
+-----
+If STATUS does not work due to terminal input oddities, use S.
+
+If the ultrasonic sensor times out, check:
+
+- Sensor VCC is connected to 5V / VIN, not 3.3V.
+- Sensor GND and ESP32 GND are connected together.
+- TRIG is connected to GPIO25.
+- ECHO divider output is connected to GPIO26.
+- The ECHO divider is wired correctly.
+- The sensor has a clear target surface below it.
