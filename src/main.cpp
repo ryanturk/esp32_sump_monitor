@@ -20,10 +20,11 @@ static const float DEFAULT_HIGH_WATER_IN = 16.0f;
 static const float DEFAULT_CLEAR_WATER_IN = 15.0f;
 static const unsigned long DEFAULT_ALERT_COOLDOWN_MS = 10UL * 60UL * 1000UL;
 static const unsigned long DEFAULT_CHIRP_PERIOD_MS = 5UL * 1000UL;
+static const unsigned long DEFAULT_BOOT_SENSOR_DELAY_MS = 10UL * 1000UL;
 
 // ================= EEPROM ==================
 static const uint32_t SETTINGS_MAGIC = 0x53554D50UL;  // "SUMP"
-static const uint16_t SETTINGS_VERSION = 2;
+static const uint16_t SETTINGS_VERSION = 3;
 static const int EEPROM_BYTES = 128;
 
 struct SumpSettings {
@@ -34,6 +35,7 @@ struct SumpSettings {
   float clearWaterIn;
   unsigned long alertCooldownMs;
   unsigned long chirpPeriodMs;
+  unsigned long bootSensorDelayMs;
   uint32_t checksum;
 };
 
@@ -50,6 +52,8 @@ unsigned long lastErrorBlinkMs = 0;
 bool alarmLatched = false;
 bool sensorTimedOut = false;
 bool errorLedOn = false;
+unsigned long bootCompleteMs = 0;
+bool bootSensorDelayAnnounced = false;
 
 // ================= ULTRASONIC ==============
 const unsigned long ECHO_TIMEOUT_US = 25000;
@@ -88,6 +92,7 @@ static void applyDefaultSettings() {
   settings.clearWaterIn = DEFAULT_CLEAR_WATER_IN;
   settings.alertCooldownMs = DEFAULT_ALERT_COOLDOWN_MS;
   settings.chirpPeriodMs = DEFAULT_CHIRP_PERIOD_MS;
+  settings.bootSensorDelayMs = DEFAULT_BOOT_SENSOR_DELAY_MS;
   settings.checksum = calculateChecksum(settings);
 }
 
@@ -113,6 +118,10 @@ static bool settingsAreValid() {
   }
 
   if (settings.chirpPeriodMs > 3600000UL) {
+    return false;
+  }
+
+  if (settings.bootSensorDelayMs > 3600000UL) {
     return false;
   }
 
@@ -226,6 +235,7 @@ static void printHelp() {
   Serial.println("  CLEAR=<inches>      alarm clear water height");
   Serial.println("  COOLDOWN=<seconds>  alert print cooldown");
   Serial.println("  CHIRP=<seconds>     alarm chirp interval, 0 disables");
+  Serial.println("  BOOTDELAY=<seconds> wait after boot before sensor reads");
   Serial.println();
 }
 
@@ -247,6 +257,7 @@ static void printHowToUse() {
   Serial.println("  HIGH=16");
   Serial.println("  CLEAR=15");
   Serial.println("  CHIRP=5");
+  Serial.println("  BOOTDELAY=10");
   Serial.println("  STATUS");
   Serial.println();
   Serial.println("Pins:");
@@ -266,6 +277,13 @@ static void printStatus() {
   Serial.println(highWater ? "true" : "false");
   Serial.print("  sensorError: ");
   Serial.println(sensorTimedOut ? "true" : "false");
+  Serial.print("  bootDelayRemainingSec: ");
+  unsigned long now = millis();
+  unsigned long bootDelayRemainingMs = 0;
+  if (bootCompleteMs > 0 && now - bootCompleteMs < settings.bootSensorDelayMs) {
+    bootDelayRemainingMs = settings.bootSensorDelayMs - (now - bootCompleteMs);
+  }
+  Serial.println((bootDelayRemainingMs + 999UL) / 1000UL);
   Serial.print("  lastAlertSecAgo: ");
   Serial.println(lastAlertSecAgo);
   Serial.println("Settings:");
@@ -279,6 +297,8 @@ static void printStatus() {
   Serial.println(settings.alertCooldownMs / 1000UL);
   Serial.print("  CHIRP=");
   Serial.println(settings.chirpPeriodMs / 1000.0f, 2);
+  Serial.print("  BOOTDELAY=");
+  Serial.println(settings.bootSensorDelayMs / 1000.0f, 2);
   Serial.println();
 }
 
@@ -436,6 +456,24 @@ static void handleCommand(const char *rawCommand) {
     return;
   }
 
+  if (parseFloatValue(command, "BOOTDELAY", floatValue)) {
+    if (floatValue < 0.0f || floatValue > 3600.0f) {
+      Serial.println("Invalid BOOTDELAY. Use seconds from 0 to 3600.");
+      return;
+    }
+
+    settings.bootSensorDelayMs = (unsigned long)(floatValue * 1000.0f);
+    saveSettings();
+    bootCompleteMs = millis();
+    bootSensorDelayAnnounced = false;
+    sensorTimedOut = false;
+    distanceIn = -1.0f;
+    waterHeightIn = 0.0f;
+    resetAlarmState();
+    Serial.println("BOOTDELAY saved");
+    return;
+  }
+
   if (parseUnsignedLongValue(command, "COOLDOWN", secondsValue)) {
     if (secondsValue > 86400UL) {
       Serial.println("Invalid COOLDOWN. Use seconds from 0 to 86400.");
@@ -513,6 +551,7 @@ void setup() {
   printStatus();
 
   digitalWrite(POWER_LED_PIN, HIGH);
+  bootCompleteMs = millis();
 }
 
 void loop() {
@@ -521,6 +560,25 @@ void loop() {
   unsigned long now = millis();
   updateIndicatorLeds(now);
   updateAlarmChirp(now);
+
+  if (now - bootCompleteMs < settings.bootSensorDelayMs) {
+    if (!bootSensorDelayAnnounced) {
+      Serial.print("Waiting ");
+      Serial.print(settings.bootSensorDelayMs / 1000.0f, 2);
+      Serial.println(" seconds before sensor reads");
+      bootSensorDelayAnnounced = true;
+    }
+    errorLedOn = true;
+    digitalWrite(ERROR_LED_PIN, HIGH);
+    lastSampleMs = now;
+    return;
+  }
+
+  if (bootSensorDelayAnnounced) {
+    bootSensorDelayAnnounced = false;
+    errorLedOn = false;
+    digitalWrite(ERROR_LED_PIN, LOW);
+  }
 
   if (now - lastSampleMs < SAMPLE_PERIOD_MS) {
     return;

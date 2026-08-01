@@ -107,6 +107,10 @@ CHIRP=<seconds>
   Sets how often the buzzer chirps while the alarm is active.
   Use CHIRP=0 to disable alarm chirps.
 
+BOOTDELAY=<seconds>
+  Sets how long the ESP32 waits after boot before reading the ultrasonic sensor.
+  Use BOOTDELAY=0 to disable the startup wait.
+
 
 Command Examples
 ----------------
@@ -133,6 +137,10 @@ CHIRP=5
 Disable alarm chirps:
 
 CHIRP=0
+
+Wait 10 seconds after boot before reading the sensor:
+
+BOOTDELAY=10
 
 Test the buzzer:
 
@@ -178,7 +186,9 @@ Recommended Setup Process
 6. Send CLEAR=<clear height>.
 7. Set chirp interval.
 8. Send CHIRP=<seconds>.
-9. Send STATUS to confirm all settings.
+9. Set boot sensor delay.
+10. Send BOOTDELAY=<seconds>.
+11. Send STATUS to confirm all settings.
 
 Example setup:
 
@@ -186,16 +196,19 @@ DEPTH=28
 HIGH=16
 CLEAR=15
 CHIRP=5
+BOOTDELAY=10
 STATUS
 
 
 LED Behavior
 ------------
 System-on LED:
-  Turns on after boot completes.
+  Turns on after boot completes. Sensor readings start after the configured
+  BOOTDELAY time has elapsed.
 
 Error LED:
-  Flashes and chirps when the ultrasonic sensor is not returning a valid echo.
+  Turns on solid during BOOTDELAY. After sensor readings start, flashes and
+  chirps when the ultrasonic sensor is not returning a valid echo.
 
 High-water alert LED:
   Turns on while the high-water alarm is active.
