@@ -195,7 +195,7 @@ System-on LED:
   Turns on after boot completes.
 
 Error LED:
-  Flashes when the ultrasonic sensor is not returning a valid echo.
+  Flashes and chirps when the ultrasonic sensor is not returning a valid echo.
 
 High-water alert LED:
   Turns on while the high-water alarm is active.

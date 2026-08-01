@@ -206,6 +206,10 @@ static void updateIndicatorLeds(unsigned long now) {
     lastErrorBlinkMs = now;
     errorLedOn = !errorLedOn;
     digitalWrite(ERROR_LED_PIN, errorLedOn ? HIGH : LOW);
+
+    if (errorLedOn) {
+      chirpBuzzer(1);
+    }
   }
 }
 
