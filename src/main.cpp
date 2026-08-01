@@ -214,6 +214,7 @@ static void printHelp() {
   Serial.println("Commands:");
   Serial.println("  STATUS");
   Serial.println("  HELP");
+  Serial.println("  HOWTO");
   Serial.println("  DEFAULTS");
   Serial.println("  TESTCHIRP");
   Serial.println("  DEPTH=<inches>      sensor-to-bottom distance");
@@ -221,6 +222,32 @@ static void printHelp() {
   Serial.println("  CLEAR=<inches>      alarm clear water height");
   Serial.println("  COOLDOWN=<seconds>  alert print cooldown");
   Serial.println("  CHIRP=<seconds>     alarm chirp interval, 0 disables");
+  Serial.println();
+}
+
+static void printHowToUse() {
+  Serial.println();
+  Serial.println("How to use:");
+  Serial.println("  Serial: 9600 baud, 8 data bits, no parity, 1 stop bit, no flow control.");
+  Serial.println("  Send commands over the ESP32 USB-C serial port and press Enter.");
+  Serial.println();
+  Serial.println("Measurements:");
+  Serial.println("  DEPTH is the distance from the sensor face to the sump bottom.");
+  Serial.println("  water height = DEPTH - measured distance to water.");
+  Serial.println("  HIGH turns the alarm on when water height reaches that value.");
+  Serial.println("  CLEAR turns the alarm off after water falls to that value or lower.");
+  Serial.println("  Keep CLEAR lower than HIGH to prevent alarm chatter.");
+  Serial.println();
+  Serial.println("Common setup:");
+  Serial.println("  DEPTH=28");
+  Serial.println("  HIGH=16");
+  Serial.println("  CLEAR=15");
+  Serial.println("  CHIRP=5");
+  Serial.println("  STATUS");
+  Serial.println();
+  Serial.println("Pins:");
+  Serial.println("  GPIO25 TRIG, GPIO26 ECHO, GPIO27 buzzer");
+  Serial.println("  GPIO21 power LED, GPIO16 error LED, GPIO17 alert LED");
   Serial.println();
 }
 
@@ -325,6 +352,11 @@ static void handleCommand(const char *rawCommand) {
 
   if (command == "HELP") {
     printHelp();
+    return;
+  }
+
+  if (command == "HOWTO") {
+    printHowToUse();
     return;
   }
 
