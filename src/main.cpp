@@ -13,6 +13,7 @@
 #define POWER_LED_PIN 21
 #define ERROR_LED_PIN 16
 #define ALERT_LED_PIN 17
+#define SENSOR_READ_LED_PIN 18
 
 // ================= DEFAULT SUMP SETTINGS ===
 static const float DEFAULT_SENSOR_TO_BOTTOM_IN = 28.0f;
@@ -49,6 +50,7 @@ int lastAlertSecAgo = -1;
 unsigned long lastAlertMs = 0;
 unsigned long lastChirpMs = 0;
 unsigned long lastErrorBlinkMs = 0;
+unsigned long sensorReadLedOffMs = 0;
 bool alarmLatched = false;
 bool sensorTimedOut = false;
 bool errorLedOn = false;
@@ -63,6 +65,7 @@ const int SAMPLES = 5;
 unsigned long lastSampleMs = 0;
 const unsigned long SAMPLE_PERIOD_MS = 1500;
 const unsigned long ERROR_BLINK_PERIOD_MS = 250;
+const unsigned long SENSOR_READ_LED_FLASH_MS = 80;
 
 // ================= SERIAL COMMANDS =========
 char commandBuffer[96];
@@ -222,6 +225,18 @@ static void updateIndicatorLeds(unsigned long now) {
   }
 }
 
+static void flashSensorReadLed(unsigned long now) {
+  digitalWrite(SENSOR_READ_LED_PIN, HIGH);
+  sensorReadLedOffMs = now + SENSOR_READ_LED_FLASH_MS;
+}
+
+static void updateSensorReadLed(unsigned long now) {
+  if (sensorReadLedOffMs != 0 && now >= sensorReadLedOffMs) {
+    digitalWrite(SENSOR_READ_LED_PIN, LOW);
+    sensorReadLedOffMs = 0;
+  }
+}
+
 static void printHelp() {
   Serial.println();
   Serial.println("Commands:");
@@ -262,7 +277,7 @@ static void printHowToUse() {
   Serial.println();
   Serial.println("Pins:");
   Serial.println("  GPIO25 TRIG, GPIO26 ECHO, GPIO27 buzzer");
-  Serial.println("  GPIO21 power LED, GPIO16 error LED, GPIO17 alert LED");
+  Serial.println("  GPIO21 power LED, GPIO16 error LED, GPIO17 alert LED, GPIO18 sensor-read LED");
   Serial.println();
 }
 
@@ -538,11 +553,13 @@ void setup() {
   pinMode(POWER_LED_PIN, OUTPUT);
   pinMode(ERROR_LED_PIN, OUTPUT);
   pinMode(ALERT_LED_PIN, OUTPUT);
+  pinMode(SENSOR_READ_LED_PIN, OUTPUT);
 
   digitalWrite(BUZZER_PIN, LOW);
   digitalWrite(POWER_LED_PIN, LOW);
   digitalWrite(ERROR_LED_PIN, LOW);
   digitalWrite(ALERT_LED_PIN, LOW);
+  digitalWrite(SENSOR_READ_LED_PIN, LOW);
 
   Serial.println();
   Serial.println("Offline sump monitor booting...");
@@ -558,6 +575,7 @@ void loop() {
   readCommandSerial();
 
   unsigned long now = millis();
+  updateSensorReadLed(now);
   updateIndicatorLeds(now);
   updateAlarmChirp(now);
 
@@ -603,6 +621,7 @@ void loop() {
   }
 
   distanceIn = measuredDistanceIn;
+  flashSensorReadLed(millis());
 
   float measuredWaterHeightIn = settings.sensorToBottomIn - measuredDistanceIn;
   if (measuredWaterHeightIn < 0.0f) measuredWaterHeightIn = 0.0f;

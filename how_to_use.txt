@@ -48,6 +48,7 @@ GPIO27 -> buzzer signal
 GPIO21 -> system-on LED
 GPIO16 -> error LED
 GPIO17 -> high-water alert LED
+GPIO18 -> sensor-read activity LED
 
 Ultrasonic sensor wiring:
 
@@ -68,6 +69,8 @@ Sensor ECHO ---- 1k resistor ---- junction ---- GPIO26
                                  GND
 
 Use one current-limiting resistor per LED. A 330 ohm resistor is a good default.
+The sensor-read activity LED flashes briefly after each valid ultrasonic sensor
+reading.
 
 For the buzzer, use a transistor driver if the buzzer is powered above 3.3V or
 draws more current than an ESP32 GPIO should supply directly.
